@@ -1,381 +1,377 @@
-"use strict";
-
-const canvas = document.getElementById("fireworksCanvas");
-const context = canvas.getContext("2d");
-const fireButton = document.getElementById("fireButton");
-
-let canvasWidth = window.innerWidth;
-let canvasHeight = window.innerHeight;
-
-let fireworks = [];
-let particles = [];
-
-const colors = [
-    "#ff0043",
-    "#14fc56",
-    "#1e7fff",
-    "#e60aff",
-    "#ffbf36",
-    "#ffffff",
-    "#00ddff",
-    "#ff5ca8",
-    "#ff7b00"
-];
-
-function resizeCanvas() {
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-
-    canvasWidth = window.innerWidth;
-    canvasHeight = window.innerHeight;
-
-    canvas.width = canvasWidth * pixelRatio;
-    canvas.height = canvasHeight * pixelRatio;
-
-    canvas.style.width = `${canvasWidth}px`;
-    canvas.style.height = `${canvasHeight}px`;
-
-    context.setTransform(
-        pixelRatio,
-        0,
-        0,
-        pixelRatio,
-        0,
-        0
-    );
+* {
+  position: relative;
+  box-sizing: border-box;
 }
 
-function random(min, max) {
-    return Math.random() * (max - min) + min;
+html,
+body {
+  height: 100%;
 }
 
-function randomColor() {
-    const index = Math.floor(Math.random() * colors.length);
-    return colors[index];
+html {
+  background-color: #000;
 }
 
-function calculateDistance(x1, y1, x2, y2) {
-    const deltaX = x2 - x1;
-    const deltaY = y2 - y1;
-
-    return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+body {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: "Russo One", arial, sans-serif;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
 }
 
-class Firework {
-    constructor(startX, startY, targetX, targetY) {
-        this.x = startX;
-        this.y = startY;
-
-        this.startX = startX;
-        this.startY = startY;
-
-        this.targetX = targetX;
-        this.targetY = targetY;
-
-        this.distanceToTarget = calculateDistance(
-            startX,
-            startY,
-            targetX,
-            targetY
-        );
-
-        this.distanceTraveled = 0;
-
-        this.coordinates = [];
-
-        for (let index = 0; index < 4; index += 1) {
-            this.coordinates.push([this.x, this.y]);
-        }
-
-        this.angle = Math.atan2(
-            targetY - startY,
-            targetX - startX
-        );
-
-        this.speed = 3;
-        this.acceleration = 1.045;
-
-        this.brightness = random(55, 85);
-        this.color = randomColor();
-    }
-
-    update(index) {
-        this.coordinates.pop();
-        this.coordinates.unshift([this.x, this.y]);
-
-        this.speed *= this.acceleration;
-
-        const velocityX = Math.cos(this.angle) * this.speed;
-        const velocityY = Math.sin(this.angle) * this.speed;
-
-        this.distanceTraveled = calculateDistance(
-            this.startX,
-            this.startY,
-            this.x + velocityX,
-            this.y + velocityY
-        );
-
-        if (this.distanceTraveled >= this.distanceToTarget) {
-            createExplosion(
-                this.targetX,
-                this.targetY,
-                this.color
-            );
-
-            fireworks.splice(index, 1);
-            return;
-        }
-
-        this.x += velocityX;
-        this.y += velocityY;
-    }
-
-    draw() {
-        context.beginPath();
-
-        const lastCoordinate =
-            this.coordinates[this.coordinates.length - 1];
-
-        context.moveTo(
-            lastCoordinate[0],
-            lastCoordinate[1]
-        );
-
-        context.lineTo(this.x, this.y);
-
-        context.strokeStyle = this.color;
-
-        context.shadowBlur = 12;
-        context.shadowColor = this.color;
-
-        context.lineWidth = 2;
-        context.stroke();
-
-        context.shadowBlur = 0;
-
-        context.beginPath();
-
-        context.arc(
-            this.targetX,
-            this.targetY,
-            2,
-            0,
-            Math.PI * 2
-        );
-
-        context.strokeStyle =
-            `hsla(0, 100%, ${this.brightness}%, 0.3)`;
-
-        context.stroke();
-    }
+.hide {
+  opacity: 0;
+  visibility: hidden;
 }
 
-class Particle {
-    constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-
-        this.coordinates = [];
-
-        for (let index = 0; index < 6; index += 1) {
-            this.coordinates.push([this.x, this.y]);
-        }
-
-        this.angle = random(0, Math.PI * 2);
-        this.speed = random(2, 11);
-
-        this.friction = 0.96;
-        this.gravity = 0.12;
-
-        this.color =
-            Math.random() > 0.18
-                ? color
-                : randomColor();
-
-        this.alpha = 1;
-        this.decay = random(0.012, 0.025);
-
-        this.brightness = random(55, 90);
-    }
-
-    update(index) {
-        this.coordinates.pop();
-        this.coordinates.unshift([this.x, this.y]);
-
-        this.speed *= this.friction;
-
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed + this.gravity;
-
-        this.alpha -= this.decay;
-
-        if (this.alpha <= this.decay) {
-            particles.splice(index, 1);
-        }
-    }
-
-    draw() {
-        context.beginPath();
-
-        const lastCoordinate =
-            this.coordinates[this.coordinates.length - 1];
-
-        context.moveTo(
-            lastCoordinate[0],
-            lastCoordinate[1]
-        );
-
-        context.lineTo(this.x, this.y);
-
-        context.strokeStyle = this.hexToRgba(
-            this.color,
-            this.alpha
-        );
-
-        context.lineWidth = 1.6;
-
-        context.shadowBlur = 10;
-        context.shadowColor = this.color;
-
-        context.stroke();
-
-        context.shadowBlur = 0;
-    }
-
-    hexToRgba(hexColor, alpha) {
-        const cleanHex = hexColor.replace("#", "");
-
-        const red = parseInt(cleanHex.substring(0, 2), 16);
-        const green = parseInt(cleanHex.substring(2, 4), 16);
-        const blue = parseInt(cleanHex.substring(4, 6), 16);
-
-        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-    }
+.remove {
+  display: none !important;
 }
 
-function createExplosion(x, y, color = randomColor()) {
-    const particleCount = Math.floor(random(70, 115));
-
-    for (let index = 0; index < particleCount; index += 1) {
-        particles.push(
-            new Particle(x, y, color)
-        );
-    }
+.blur {
+  -webkit-filter: blur(12px);
+          filter: blur(12px);
 }
 
-function launchFirework(targetX, targetY) {
-    const startX = random(
-        canvasWidth * 0.2,
-        canvasWidth * 0.8
-    );
-
-    const startY = canvasHeight + 10;
-
-    fireworks.push(
-        new Firework(
-            startX,
-            startY,
-            targetX,
-            targetY
-        )
-    );
+.container {
+  height: 100%;
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+          align-items: center;
 }
 
-function launchRandomFirework() {
-    const targetX = random(
-        canvasWidth * 0.12,
-        canvasWidth * 0.88
-    );
-
-    const targetY = random(
-        canvasHeight * 0.08,
-        canvasHeight * 0.57
-    );
-
-    launchFirework(targetX, targetY);
+.loading-init {
+  width: 100%;
+  align-self: center;
+  text-align: center;
+  text-transform: uppercase;
+}
+.loading-init__header {
+  font-size: 2.2em;
+}
+.loading-init__status {
+  margin-top: 1em;
+  font-size: 0.8em;
+  opacity: 0.75;
 }
 
-function launchFireworkGroup() {
-    const amount = Math.floor(random(2, 5));
-
-    for (let index = 0; index < amount; index += 1) {
-        window.setTimeout(() => {
-            launchRandomFirework();
-        }, index * 180);
-    }
+.stage-container {
+  overflow: hidden;
+  box-sizing: initial;
+  border: 1px solid #222;
+  margin: -1px;
+}
+@media (max-width: 840px) {
+  .stage-container {
+    border: none;
+    margin: 0;
+  }
 }
 
-function animate() {
-    window.requestAnimationFrame(animate);
-
-    context.globalCompositeOperation = "destination-out";
-
-    context.fillStyle = "rgba(0, 0, 0, 0.18)";
-
-    context.fillRect(
-        0,
-        0,
-        canvasWidth,
-        canvasHeight
-    );
-
-    context.globalCompositeOperation = "lighter";
-
-    for (
-        let index = fireworks.length - 1;
-        index >= 0;
-        index -= 1
-    ) {
-        fireworks[index].draw();
-        fireworks[index].update(index);
-    }
-
-    for (
-        let index = particles.length - 1;
-        index >= 0;
-        index -= 1
-    ) {
-        particles[index].draw();
-        particles[index].update(index);
-    }
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  -webkit-transition: -webkit-filter 0.3s;
+  transition: -webkit-filter 0.3s;
+  transition: filter 0.3s;
+  transition: filter 0.3s, -webkit-filter 0.3s;
+}
+.canvas-container canvas {
+  position: absolute;
+  mix-blend-mode: lighten;
+  -webkit-transform: translateZ(0);
+          transform: translateZ(0);
 }
 
-canvas.addEventListener("pointerdown", (event) => {
-    launchFirework(
-        event.clientX,
-        event.clientY
-    );
-});
+.controls {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  padding-bottom: 50px;
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-pack: justify;
+          justify-content: space-between;
+  -webkit-transition: opacity 0.3s, visibility 0.3s;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+@media (min-width: 840px) {
+  .controls {
+    visibility: visible;
+  }
+  .controls.hide:hover {
+    opacity: 1;
+  }
+}
 
-fireButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    launchFireworkGroup();
-});
+.menu {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.42);
+  -webkit-transition: opacity 0.3s, visibility 0.3s;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+.menu__inner-wrap {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+          flex-direction: column;
+  -webkit-box-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+          align-items: center;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  -webkit-transition: opacity 0.3s;
+  transition: opacity 0.3s;
+}
+.menu__header {
+  margin-top: auto;
+  margin-bottom: 8px;
+  padding-top: 16px;
+  font-size: 2em;
+  text-transform: uppercase;
+}
+.menu__subheader {
+  margin-bottom: auto;
+  padding-bottom: 12px;
+  font-size: 0.86em;
+  opacity: 0.8;
+}
+.menu form {
+  width: 100%;
+  max-width: 400px;
+  padding: 0 10px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.menu .form-option {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-align: center;
+          align-items: center;
+  margin: 16px 0;
+  -webkit-transition: opacity 0.3s;
+  transition: opacity 0.3s;
+}
+.menu .form-option label {
+  display: block;
+  width: 50%;
+  padding-right: 12px;
+  text-align: right;
+  text-transform: uppercase;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+}
+.menu .form-option--select select {
+  display: block;
+  width: 50%;
+  height: 30px;
+  font-size: 1rem;
+  font-family: "Russo One", arial, sans-serif;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.06em;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.menu .form-option--select select option {
+  background-color: black;
+}
+.menu .form-option--checkbox input {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  opacity: 0.5;
+}
+@media (max-width: 840px) {
+  .menu .form-option select, .menu .form-option input {
+    outline: none;
+  }
+}
 
-window.addEventListener("resize", resizeCanvas);
+.close-menu-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
 
-resizeCanvas();
-animate();
+.btn {
+  opacity: 0.16;
+  width: 50px;
+  height: 50px;
+  display: -webkit-box;
+  display: flex;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+  cursor: default;
+  -webkit-transition: opacity 0.3s;
+  transition: opacity 0.3s;
+}
+.btn--bright {
+  opacity: 0.5;
+}
+@media (min-width: 840px) {
+  .btn:hover {
+    opacity: 0.32;
+  }
+  .btn--bright:hover {
+    opacity: 0.75;
+  }
+}
+.btn svg {
+  display: block;
+  margin: auto;
+}
 
-/* Pháo hoa lúc mới mở trang */
-window.setTimeout(() => {
-    launchFireworkGroup();
-}, 500);
+.credits {
+  margin-top: auto;
+  margin-bottom: 10px;
+  padding-top: 6px;
+  font-size: 0.8em;
+  opacity: 0.75;
+}
+.credits a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+}
+.credits a:hover, .credits a:active {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: underline;
+}
 
-window.setTimeout(() => {
-    launchFireworkGroup();
-}, 1600);
-
-window.setTimeout(() => {
-    launchFireworkGroup();
-}, 2800);
-
-/* Tự động bắn pháo hoa liên tục */
-window.setInterval(() => {
-    launchRandomFirework();
-
-    if (Math.random() > 0.65) {
-        window.setTimeout(() => {
-            launchRandomFirework();
-        }, 250);
-    }
-}, 1200);
+.help-modal {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+          align-items: center;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  visibility: hidden;
+  -webkit-transition-property: visibility;
+  transition-property: visibility;
+  -webkit-transition-duration: 0.25s;
+          transition-duration: 0.25s;
+}
+.help-modal__overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  -webkit-transition-property: opacity;
+  transition-property: opacity;
+  -webkit-transition-timing-function: ease-in;
+          transition-timing-function: ease-in;
+  -webkit-transition-duration: 0.25s;
+          transition-duration: 0.25s;
+}
+.help-modal__dialog {
+  display: -webkit-box;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+          flex-direction: column;
+  -webkit-box-align: center;
+          align-items: center;
+  max-width: 400px;
+  max-height: calc(100vh - 100px);
+  margin: 10px;
+  padding: 20px;
+  border-radius: 0.3em;
+  background-color: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  -webkit-transform: scale(0.9, 0.9);
+          transform: scale(0.9, 0.9);
+  -webkit-transition-property: opacity, -webkit-transform;
+  transition-property: opacity, -webkit-transform;
+  transition-property: opacity, transform;
+  transition-property: opacity, transform, -webkit-transform;
+  -webkit-transition-timing-function: ease-in;
+          transition-timing-function: ease-in;
+  -webkit-transition-duration: 0.25s;
+          transition-duration: 0.25s;
+}
+@media (min-width: 840px) {
+  .help-modal__dialog {
+    font-size: 1.25rem;
+    max-width: 500px;
+  }
+}
+.help-modal__header {
+  font-size: 1.75em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.help-modal__body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1em 0;
+  padding: 1em 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+}
+.help-modal__close-btn {
+  flex-shrink: 0;
+  outline: none;
+  border: none;
+  border-radius: 2px;
+  padding: 0.25em 0.75em;
+  margin-top: 0.36em;
+  font-family: "Russo One", arial, sans-serif;
+  font-size: 1em;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;      
+  letter-spacing: 0.06em;
+  background-color: rgba(255, 255, 255, 0.25);
+  -webkit-transition: color 0.3s, background-color 0.3s;
+  transition: color 0.3s, background-color 0.3s;
+}
+.help-modal__close-btn:hover, .help-modal__close-btn:active, .help-modal__close-btn:focus {
+  color: #FFF;
+  background-color: #09F;
+}
+.help-modal.active {
+  visibility: visible;
+  -webkit-transition-duration: 0.4s;
+          transition-duration: 0.4s;
+}
+.help-modal.active .help-modal__overlay {
+  opacity: 1;
+  -webkit-transition-timing-function: ease-out;
+          transition-timing-function: ease-out;
+  -webkit-transition-duration: 0.4s;
+          transition-duration: 0.4s;
+}
+.help-modal.active .help-modal__dialog {
+  opacity: 1;
+  -webkit-transform: scale(1, 1);
+          transform: scale(1, 1);
+  -webkit-transition-timing-function: ease-out;
+          transition-timing-function: ease-out;
+  -webkit-transition-duration: 0.4s;
+          transition-duration: 0.4s;
+}
