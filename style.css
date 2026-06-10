@@ -1,340 +1,381 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+"use strict";
+
+const canvas = document.getElementById("fireworksCanvas");
+const context = canvas.getContext("2d");
+const fireButton = document.getElementById("fireButton");
+
+let canvasWidth = window.innerWidth;
+let canvasHeight = window.innerHeight;
+
+let fireworks = [];
+let particles = [];
+
+const colors = [
+    "#ff0043",
+    "#14fc56",
+    "#1e7fff",
+    "#e60aff",
+    "#ffbf36",
+    "#ffffff",
+    "#00ddff",
+    "#ff5ca8",
+    "#ff7b00"
+];
+
+function resizeCanvas() {
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
+
+    canvas.width = canvasWidth * pixelRatio;
+    canvas.height = canvasHeight * pixelRatio;
+
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+
+    context.setTransform(
+        pixelRatio,
+        0,
+        0,
+        pixelRatio,
+        0,
+        0
+    );
 }
 
-html,
-body {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+function random(min, max) {
+    return Math.random() * (max - min) + min;
 }
 
-body {
-    position: relative;
-    background:
-        radial-gradient(
-            circle at center,
-            #101843 0%,
-            #050816 45%,
-            #000000 100%
+function randomColor() {
+    const index = Math.floor(Math.random() * colors.length);
+    return colors[index];
+}
+
+function calculateDistance(x1, y1, x2, y2) {
+    const deltaX = x2 - x1;
+    const deltaY = y2 - y1;
+
+    return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+class Firework {
+    constructor(startX, startY, targetX, targetY) {
+        this.x = startX;
+        this.y = startY;
+
+        this.startX = startX;
+        this.startY = startY;
+
+        this.targetX = targetX;
+        this.targetY = targetY;
+
+        this.distanceToTarget = calculateDistance(
+            startX,
+            startY,
+            targetX,
+            targetY
         );
 
-    font-family: Arial, Helvetica, sans-serif;
-}
+        this.distanceTraveled = 0;
 
-/* Canvas pháo hoa */
-#fireworksCanvas {
-    position: fixed;
-    inset: 0;
+        this.coordinates = [];
 
-    width: 100%;
-    height: 100%;
+        for (let index = 0; index < 4; index += 1) {
+            this.coordinates.push([this.x, this.y]);
+        }
 
-    z-index: 1;
-    cursor: crosshair;
-}
+        this.angle = Math.atan2(
+            targetY - startY,
+            targetX - startX
+        );
 
-/* Nội dung lời chúc */
-.content {
-    position: fixed;
+        this.speed = 3;
+        this.acceleration = 1.045;
 
-    top: 50%;
-    left: 50%;
-
-    z-index: 10;
-
-    width: 92%;
-    max-width: 950px;
-
-    padding: 30px 20px;
-
-    text-align: center;
-    pointer-events: none;
-
-    transform: translate(-50%, -50%);
-
-    animation: contentAppear 2s ease-out forwards;
-}
-
-/* Ngôi sao */
-.star {
-    margin-bottom: 12px;
-
-    color: #fff2a8;
-
-    font-size: clamp(40px, 7vw, 85px);
-
-    text-shadow:
-        0 0 8px #ffffff,
-        0 0 18px #ffd700,
-        0 0 35px #ff8c00,
-        0 0 55px #ff5500;
-
-    animation:
-        starRotate 5s linear infinite,
-        starGlow 1.2s ease-in-out infinite alternate;
-}
-
-/* Chữ chính */
-.content h1 {
-    color: #ffffff;
-
-    font-size: clamp(42px, 9vw, 120px);
-    font-weight: 900;
-
-    line-height: 1.1;
-    letter-spacing: 0.06em;
-
-    text-shadow:
-        0 0 5px #ffffff,
-        0 0 15px #00ddff,
-        0 0 30px #0099ff,
-        0 0 50px #8a2be2,
-        0 0 80px #ff00cc;
-
-    animation:
-        titleGlow 1.4s ease-in-out infinite alternate,
-        titleFloat 3s ease-in-out infinite;
-}
-
-/* Dòng phụ */
-.content p {
-    margin-top: 24px;
-
-    color: rgba(255, 255, 255, 0.98);
-
-    font-size: clamp(17px, 2.4vw, 29px);
-    font-weight: 700;
-
-    line-height: 1.5;
-    letter-spacing: 0.05em;
-
-    text-shadow:
-        0 0 5px #000000,
-        0 0 12px #00bfff,
-        0 0 22px #0066ff;
-}
-
-/* Lời chúc nhỏ */
-.message {
-    margin-top: 15px;
-
-    color: #ffeaa7;
-
-    font-size: clamp(15px, 1.8vw, 22px);
-    font-weight: 600;
-
-    letter-spacing: 0.04em;
-
-    text-shadow:
-        0 0 8px #000000,
-        0 0 15px #ff9900;
-}
-
-/* Nút bắn pháo hoa */
-#fireButton {
-    position: relative;
-
-    margin-top: 30px;
-    padding: 13px 28px;
-
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    border-radius: 999px;
-
-    color: #ffffff;
-    background: rgba(20, 30, 80, 0.55);
-
-    font-size: 16px;
-    font-weight: 700;
-
-    letter-spacing: 0.04em;
-
-    cursor: pointer;
-    pointer-events: auto;
-
-    backdrop-filter: blur(8px);
-
-    box-shadow:
-        0 0 10px rgba(0, 217, 255, 0.6),
-        inset 0 0 10px rgba(255, 255, 255, 0.15);
-
-    transition:
-        transform 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease;
-}
-
-#fireButton:hover {
-    transform: scale(1.08);
-
-    background: rgba(80, 30, 130, 0.75);
-
-    box-shadow:
-        0 0 15px #00ddff,
-        0 0 30px rgba(255, 0, 204, 0.75);
-}
-
-#fireButton:active {
-    transform: scale(0.96);
-}
-
-/* Hướng dẫn phía dưới */
-.instruction {
-    position: fixed;
-
-    bottom: 18px;
-    left: 50%;
-
-    z-index: 10;
-
-    color: rgba(255, 255, 255, 0.65);
-
-    font-size: 13px;
-    letter-spacing: 0.04em;
-
-    pointer-events: none;
-
-    transform: translateX(-50%);
-
-    animation: instructionBlink 2s ease-in-out infinite;
-}
-
-/* Hiệu ứng xuất hiện */
-@keyframes contentAppear {
-    0% {
-        opacity: 0;
-
-        transform:
-            translate(-50%, -50%)
-            scale(0.25);
-
-        filter: blur(15px);
+        this.brightness = random(55, 85);
+        this.color = randomColor();
     }
 
-    65% {
-        opacity: 1;
+    update(index) {
+        this.coordinates.pop();
+        this.coordinates.unshift([this.x, this.y]);
 
-        transform:
-            translate(-50%, -50%)
-            scale(1.08);
+        this.speed *= this.acceleration;
 
-        filter: blur(0);
+        const velocityX = Math.cos(this.angle) * this.speed;
+        const velocityY = Math.sin(this.angle) * this.speed;
+
+        this.distanceTraveled = calculateDistance(
+            this.startX,
+            this.startY,
+            this.x + velocityX,
+            this.y + velocityY
+        );
+
+        if (this.distanceTraveled >= this.distanceToTarget) {
+            createExplosion(
+                this.targetX,
+                this.targetY,
+                this.color
+            );
+
+            fireworks.splice(index, 1);
+            return;
+        }
+
+        this.x += velocityX;
+        this.y += velocityY;
     }
 
-    100% {
-        opacity: 1;
+    draw() {
+        context.beginPath();
 
-        transform:
-            translate(-50%, -50%)
-            scale(1);
+        const lastCoordinate =
+            this.coordinates[this.coordinates.length - 1];
 
-        filter: blur(0);
+        context.moveTo(
+            lastCoordinate[0],
+            lastCoordinate[1]
+        );
+
+        context.lineTo(this.x, this.y);
+
+        context.strokeStyle = this.color;
+
+        context.shadowBlur = 12;
+        context.shadowColor = this.color;
+
+        context.lineWidth = 2;
+        context.stroke();
+
+        context.shadowBlur = 0;
+
+        context.beginPath();
+
+        context.arc(
+            this.targetX,
+            this.targetY,
+            2,
+            0,
+            Math.PI * 2
+        );
+
+        context.strokeStyle =
+            `hsla(0, 100%, ${this.brightness}%, 0.3)`;
+
+        context.stroke();
     }
 }
 
-/* Chữ phát sáng */
-@keyframes titleGlow {
-    from {
-        text-shadow:
-            0 0 5px #ffffff,
-            0 0 12px #00ddff,
-            0 0 28px #008cff,
-            0 0 48px #7b2cff;
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+
+        this.coordinates = [];
+
+        for (let index = 0; index < 6; index += 1) {
+            this.coordinates.push([this.x, this.y]);
+        }
+
+        this.angle = random(0, Math.PI * 2);
+        this.speed = random(2, 11);
+
+        this.friction = 0.96;
+        this.gravity = 0.12;
+
+        this.color =
+            Math.random() > 0.18
+                ? color
+                : randomColor();
+
+        this.alpha = 1;
+        this.decay = random(0.012, 0.025);
+
+        this.brightness = random(55, 90);
     }
 
-    to {
-        text-shadow:
-            0 0 8px #ffffff,
-            0 0 20px #00ddff,
-            0 0 40px #008cff,
-            0 0 65px #ff00cc,
-            0 0 95px #ff0080;
+    update(index) {
+        this.coordinates.pop();
+        this.coordinates.unshift([this.x, this.y]);
+
+        this.speed *= this.friction;
+
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed + this.gravity;
+
+        this.alpha -= this.decay;
+
+        if (this.alpha <= this.decay) {
+            particles.splice(index, 1);
+        }
+    }
+
+    draw() {
+        context.beginPath();
+
+        const lastCoordinate =
+            this.coordinates[this.coordinates.length - 1];
+
+        context.moveTo(
+            lastCoordinate[0],
+            lastCoordinate[1]
+        );
+
+        context.lineTo(this.x, this.y);
+
+        context.strokeStyle = this.hexToRgba(
+            this.color,
+            this.alpha
+        );
+
+        context.lineWidth = 1.6;
+
+        context.shadowBlur = 10;
+        context.shadowColor = this.color;
+
+        context.stroke();
+
+        context.shadowBlur = 0;
+    }
+
+    hexToRgba(hexColor, alpha) {
+        const cleanHex = hexColor.replace("#", "");
+
+        const red = parseInt(cleanHex.substring(0, 2), 16);
+        const green = parseInt(cleanHex.substring(2, 4), 16);
+        const blue = parseInt(cleanHex.substring(4, 6), 16);
+
+        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+}
+
+function createExplosion(x, y, color = randomColor()) {
+    const particleCount = Math.floor(random(70, 115));
+
+    for (let index = 0; index < particleCount; index += 1) {
+        particles.push(
+            new Particle(x, y, color)
+        );
     }
 }
 
-/* Chữ bay nhẹ */
-@keyframes titleFloat {
-    0%,
-    100% {
-        transform: translateY(0);
-    }
+function launchFirework(targetX, targetY) {
+    const startX = random(
+        canvasWidth * 0.2,
+        canvasWidth * 0.8
+    );
 
-    50% {
-        transform: translateY(-10px);
+    const startY = canvasHeight + 10;
+
+    fireworks.push(
+        new Firework(
+            startX,
+            startY,
+            targetX,
+            targetY
+        )
+    );
+}
+
+function launchRandomFirework() {
+    const targetX = random(
+        canvasWidth * 0.12,
+        canvasWidth * 0.88
+    );
+
+    const targetY = random(
+        canvasHeight * 0.08,
+        canvasHeight * 0.57
+    );
+
+    launchFirework(targetX, targetY);
+}
+
+function launchFireworkGroup() {
+    const amount = Math.floor(random(2, 5));
+
+    for (let index = 0; index < amount; index += 1) {
+        window.setTimeout(() => {
+            launchRandomFirework();
+        }, index * 180);
     }
 }
 
-/* Ngôi sao xoay */
-@keyframes starRotate {
-    from {
-        transform: rotate(0deg);
+function animate() {
+    window.requestAnimationFrame(animate);
+
+    context.globalCompositeOperation = "destination-out";
+
+    context.fillStyle = "rgba(0, 0, 0, 0.18)";
+
+    context.fillRect(
+        0,
+        0,
+        canvasWidth,
+        canvasHeight
+    );
+
+    context.globalCompositeOperation = "lighter";
+
+    for (
+        let index = fireworks.length - 1;
+        index >= 0;
+        index -= 1
+    ) {
+        fireworks[index].draw();
+        fireworks[index].update(index);
     }
 
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@keyframes starGlow {
-    from {
-        opacity: 0.7;
-        scale: 0.9;
-    }
-
-    to {
-        opacity: 1;
-        scale: 1.18;
-    }
-}
-
-@keyframes instructionBlink {
-    0%,
-    100% {
-        opacity: 0.35;
-    }
-
-    50% {
-        opacity: 1;
-    }
-}
-
-/* Điện thoại */
-@media (max-width: 600px) {
-    .content {
-        top: 47%;
-        width: 96%;
-        padding: 15px 10px;
-    }
-
-    .content h1 {
-        font-size: clamp(36px, 13vw, 70px);
-        letter-spacing: 0.02em;
-    }
-
-    .content p {
-        margin-top: 17px;
-        padding: 0 10px;
-
-        font-size: 17px;
-    }
-
-    .message {
-        font-size: 14px;
-    }
-
-    #fireButton {
-        margin-top: 24px;
-        padding: 11px 22px;
-
-        font-size: 14px;
-    }
-
-    .instruction {
-        bottom: 12px;
-
-        width: 100%;
-        text-align: center;
+    for (
+        let index = particles.length - 1;
+        index >= 0;
+        index -= 1
+    ) {
+        particles[index].draw();
+        particles[index].update(index);
     }
 }
+
+canvas.addEventListener("pointerdown", (event) => {
+    launchFirework(
+        event.clientX,
+        event.clientY
+    );
+});
+
+fireButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    launchFireworkGroup();
+});
+
+window.addEventListener("resize", resizeCanvas);
+
+resizeCanvas();
+animate();
+
+/* Pháo hoa lúc mới mở trang */
+window.setTimeout(() => {
+    launchFireworkGroup();
+}, 500);
+
+window.setTimeout(() => {
+    launchFireworkGroup();
+}, 1600);
+
+window.setTimeout(() => {
+    launchFireworkGroup();
+}, 2800);
+
+/* Tự động bắn pháo hoa liên tục */
+window.setInterval(() => {
+    launchRandomFirework();
+
+    if (Math.random() > 0.65) {
+        window.setTimeout(() => {
+            launchRandomFirework();
+        }, 250);
+    }
+}, 1200);
